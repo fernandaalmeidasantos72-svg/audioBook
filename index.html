@@ -1,1 +1,700 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leitor em Voz — Fernanda</title>
+  <meta name="theme-color" content="#6B4C8A" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="icon" type="image/png" href="icon-192.png" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --bg: #F7F4FB;
+      --surface: #FFFFFF;
+      --primary: #6B4C8A;
+      --primary-light: #9B7BB8;
+      --primary-faint: #EDE6F5;
+      --accent: #C8956C;
+      --text: #2A1F35;
+      --text-muted: #7A6B88;
+      --border: #DDD6E8;
+      --radius: 16px;
+      --shadow: 0 4px 24px rgba(107,76,138,0.10);
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 40px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    header .icon {
+      font-size: 2.8rem;
+      margin-bottom: 6px;
+    }
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+      letter-spacing: -0.5px;
+    }
+    header p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+      margin-bottom: 16px;
+    }
+
+    /* Upload zone */
+    #drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--primary-faint);
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: var(--primary);
+      background: #E8DEFA;
+    }
+    #drop-zone .dz-icon { font-size: 2.4rem; margin-bottom: 8px; }
+    #drop-zone p { color: var(--text-muted); font-size: 0.9rem; }
+    #drop-zone strong { color: var(--primary); }
+    #file-input { display: none; }
+
+    /* Book info */
+    #book-info {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: var(--primary-faint);
+      border-radius: 10px;
+      margin-bottom: 16px;
+    }
+    #book-info .book-icon { font-size: 1.6rem; }
+    #book-info .book-name {
+      font-weight: 600;
+      color: var(--primary);
+      font-size: 0.95rem;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #book-info .page-count {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* Progress */
+    #progress-wrap {
+      display: none;
+      margin-bottom: 16px;
+    }
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .progress-bar-bg {
+      background: var(--border);
+      border-radius: 99px;
+      height: 8px;
+      overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      border-radius: 99px;
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+
+    /* Page nav */
+    #page-nav {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    #page-nav button {
+      background: var(--primary-faint);
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      color: var(--primary);
+      font-size: 1rem;
+      font-weight: 600;
+      transition: background 0.15s;
+    }
+    #page-nav button:hover { background: var(--border); }
+    #page-nav button:disabled { opacity: 0.35; cursor: default; }
+    #page-display {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      min-width: 90px;
+      text-align: center;
+    }
+
+    /* Text preview */
+    #text-preview {
+      display: none;
+      background: var(--bg);
+      border-radius: 10px;
+      padding: 16px;
+      font-size: 0.88rem;
+      color: var(--text);
+      max-height: 160px;
+      overflow-y: auto;
+      line-height: 1.7;
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+      white-space: pre-wrap;
+    }
+    #text-preview::-webkit-scrollbar { width: 6px; }
+    #text-preview::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+    /* Controls */
+    #controls { display: none; }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 12px;
+      padding: 14px 22px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+      flex: 1;
+      justify-content: center;
+      min-width: 120px;
+    }
+    .btn-secondary {
+      background: var(--primary-faint);
+      color: var(--primary);
+    }
+    .btn-danger {
+      background: #FDE8E8;
+      color: #C0392B;
+    }
+
+    /* Speed & voice */
+    .settings-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .settings-row label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .settings-row input[type=range] {
+      flex: 1;
+      accent-color: var(--primary);
+      min-width: 80px;
+    }
+    .settings-row select {
+      flex: 1;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      color: var(--text);
+      background: var(--bg);
+      min-width: 0;
+    }
+
+    #speed-val {
+      font-size: 0.8rem;
+      color: var(--primary);
+      font-weight: 700;
+      min-width: 32px;
+    }
+
+    /* Speaking indicator */
+    #speaking-badge {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 99px;
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      width: fit-content;
+      margin: 0 auto 10px;
+    }
+    #speaking-badge.active { display: flex; }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    /* Status */
+    #status {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      text-align: center;
+      min-height: 18px;
+      margin-top: 6px;
+    }
+
+    /* New file btn */
+    #new-file-btn {
+      display: none;
+      margin: 0 auto;
+      background: none;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 20px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    #new-file-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* Install banner */
+    #install-banner {
+      display: none;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      width: 100%;
+      max-width: 480px;
+      margin-top: 8px;
+      align-items: center;
+      gap: 12px;
+    }
+    #install-banner p { flex: 1; font-size: 0.88rem; line-height: 1.4; }
+    #install-banner button {
+      background: #fff;
+      color: var(--primary);
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    footer {
+      margin-top: 24px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="icon">📖</div>
+  <h1>Leitor em Voz</h1>
+  <p>Anexe um PDF e ouça o livro enquanto faz outras coisas</p>
+</header>
+
+<div class="card">
+  <!-- Upload -->
+  <div id="drop-zone">
+    <div class="dz-icon">📄</div>
+    <p><strong>Toque aqui para escolher um PDF</strong></p>
+    <p style="margin-top:6px">ou arraste e solte o arquivo</p>
+    <input type="file" id="file-input" accept="application/pdf" />
+  </div>
+
+  <!-- Book info -->
+  <div id="book-info">
+    <span class="book-icon">📚</span>
+    <span class="book-name" id="book-name">—</span>
+    <span class="page-count" id="page-count">— págs</span>
+  </div>
+
+  <!-- Progress -->
+  <div id="progress-wrap">
+    <div class="progress-label">
+      <span>Progresso</span>
+      <span id="progress-pct">0%</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div id="progress-bar"></div>
+    </div>
+  </div>
+
+  <!-- Page nav -->
+  <div id="page-nav">
+    <button id="btn-prev">◀ Anterior</button>
+    <span id="page-display">Pág 1 de 1</span>
+    <button id="btn-next">Próxima ▶</button>
+  </div>
+
+  <!-- Text preview -->
+  <div id="text-preview"></div>
+
+  <!-- Speaking badge -->
+  <div id="speaking-badge"><div class="dot"></div> Lendo…</div>
+
+  <!-- Controls -->
+  <div id="controls">
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-play">▶ Ouvir</button>
+      <button class="btn btn-secondary" id="btn-pause" disabled>⏸ Pausar</button>
+      <button class="btn btn-danger" id="btn-stop">⏹ Parar</button>
+    </div>
+
+    <div class="settings-row">
+      <label>Velocidade</label>
+      <input type="range" id="speed-range" min="0.5" max="2" step="0.1" value="1" />
+      <span id="speed-val">1.0×</span>
+    </div>
+
+    <div class="settings-row">
+      <label>Voz</label>
+      <select id="voice-select"></select>
+    </div>
+
+    <p id="status">Pronto para leitura.</p>
+  </div>
+</div>
+
+<button id="new-file-btn">↩ Abrir outro PDF</button>
+
+<div id="install-banner">
+  <p>📲 Instale o app no seu celular para usar offline!</p>
+  <button id="install-btn">Instalar</button>
+</div>
+
+<footer>Funciona sem internet após instalado &bull; Leitura salva por sessão</footer>
+
+<!-- Service Worker & PWA -->
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  // ── State ──────────────────────────────────────────────
+  let pdfDoc = null;
+  let currentPage = 1;
+  let totalPages = 0;
+  let pageTexts = {};
+  let utterance = null;
+  let isPaused = false;
+  let deferredInstall = null;
+
+  // ── Elements ───────────────────────────────────────────
+  const dropZone       = document.getElementById('drop-zone');
+  const fileInput      = document.getElementById('file-input');
+  const bookInfo       = document.getElementById('book-info');
+  const bookName       = document.getElementById('book-name');
+  const pageCountEl    = document.getElementById('page-count');
+  const progressWrap   = document.getElementById('progress-wrap');
+  const progressBar    = document.getElementById('progress-bar');
+  const progressPct    = document.getElementById('progress-pct');
+  const pageNav        = document.getElementById('page-nav');
+  const pageDisplay    = document.getElementById('page-display');
+  const btnPrev        = document.getElementById('btn-prev');
+  const btnNext        = document.getElementById('btn-next');
+  const textPreview    = document.getElementById('text-preview');
+  const speakingBadge  = document.getElementById('speaking-badge');
+  const controls       = document.getElementById('controls');
+  const btnPlay        = document.getElementById('btn-play');
+  const btnPause       = document.getElementById('btn-pause');
+  const btnStop        = document.getElementById('btn-stop');
+  const speedRange     = document.getElementById('speed-range');
+  const speedVal       = document.getElementById('speed-val');
+  const voiceSelect    = document.getElementById('voice-select');
+  const statusEl       = document.getElementById('status');
+  const newFileBtn     = document.getElementById('new-file-btn');
+  const installBanner  = document.getElementById('install-banner');
+  const installBtn     = document.getElementById('install-btn');
+
+  // ── Voices ─────────────────────────────────────────────
+  function loadVoices() {
+    const voices = speechSynthesis.getVoices();
+    voiceSelect.innerHTML = '';
+    // prefer PT-BR
+    const ptVoices = voices.filter(v => v.lang.startsWith('pt'));
+    const others   = voices.filter(v => !v.lang.startsWith('pt'));
+    const ordered  = [...ptVoices, ...others];
+    if (!ordered.length) {
+      voiceSelect.innerHTML = '<option>Voz padrão do sistema</option>';
+      return;
+    }
+    ordered.forEach((v, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = `${v.name} (${v.lang})`;
+      opt.dataset.index = voices.indexOf(v);
+      voiceSelect.appendChild(opt);
+    });
+  }
+  speechSynthesis.onvoiceschanged = loadVoices;
+  loadVoices();
+
+  function getSelectedVoice() {
+    const opt = voiceSelect.selectedOptions[0];
+    if (!opt || !opt.dataset.index) return null;
+    return speechSynthesis.getVoices()[parseInt(opt.dataset.index)];
+  }
+
+  // ── Speed ──────────────────────────────────────────────
+  speedRange.addEventListener('input', () => {
+    speedVal.textContent = parseFloat(speedRange.value).toFixed(1) + '×';
+    if (utterance) utterance.rate = parseFloat(speedRange.value);
+  });
+
+  // ── Drop zone ──────────────────────────────────────────
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'application/pdf') loadPDF(file);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) loadPDF(fileInput.files[0]);
+  });
+
+  // ── Load PDF ───────────────────────────────────────────
+  async function loadPDF(file) {
+    stopSpeech();
+    pageTexts = {};
+    currentPage = 1;
+
+    statusEl.textContent = 'Carregando PDF…';
+    const arrayBuffer = await file.arrayBuffer();
+    pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    totalPages = pdfDoc.numPages;
+
+    // UI
+    dropZone.style.display = 'none';
+    bookName.textContent = file.name.replace('.pdf','');
+    pageCountEl.textContent = totalPages + ' págs';
+    bookInfo.style.display = 'flex';
+    progressWrap.style.display = 'block';
+    pageNav.style.display = 'flex';
+    textPreview.style.display = 'block';
+    controls.style.display = 'block';
+    newFileBtn.style.display = 'block';
+
+    await renderPage(currentPage);
+    statusEl.textContent = 'PDF carregado. Toque em Ouvir para começar.';
+  }
+
+  async function getPageText(pageNum) {
+    if (pageTexts[pageNum]) return pageTexts[pageNum];
+    const page = await pdfDoc.getPage(pageNum);
+    const content = await page.getTextContent();
+    const text = content.items.map(i => i.str).join(' ').replace(/\s+/g, ' ').trim();
+    pageTexts[pageNum] = text;
+    return text;
+  }
+
+  async function renderPage(pageNum) {
+    currentPage = pageNum;
+    const text = await getPageText(pageNum);
+    textPreview.textContent = text || '(Página sem texto — pode ser uma imagem escaneada)';
+    pageDisplay.textContent = `Pág ${pageNum} de ${totalPages}`;
+    btnPrev.disabled = pageNum <= 1;
+    btnNext.disabled = pageNum >= totalPages;
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const pct = Math.round((currentPage / totalPages) * 100);
+    progressBar.style.width = pct + '%';
+    progressPct.textContent = pct + '%';
+  }
+
+  // ── Page nav ───────────────────────────────────────────
+  btnPrev.addEventListener('click', async () => {
+    stopSpeech();
+    if (currentPage > 1) await renderPage(currentPage - 1);
+  });
+  btnNext.addEventListener('click', async () => {
+    stopSpeech();
+    if (currentPage < totalPages) await renderPage(currentPage + 1);
+  });
+
+  // ── Speech ─────────────────────────────────────────────
+  async function startSpeech() {
+    if (!pdfDoc) return;
+    stopSpeech();
+
+    const text = await getPageText(currentPage);
+    if (!text) {
+      statusEl.textContent = 'Página sem texto legível.';
+      return;
+    }
+
+    utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate  = parseFloat(speedRange.value);
+    utterance.pitch = 1;
+    utterance.lang  = 'pt-BR';
+    const v = getSelectedVoice();
+    if (v) utterance.voice = v;
+
+    utterance.onstart = () => {
+      speakingBadge.classList.add('active');
+      btnPlay.disabled  = true;
+      btnPause.disabled = false;
+      statusEl.textContent = `Lendo página ${currentPage} de ${totalPages}…`;
+      isPaused = false;
+    };
+
+    utterance.onend = async () => {
+      speakingBadge.classList.remove('active');
+      btnPlay.disabled  = false;
+      btnPause.disabled = true;
+      isPaused = false;
+      if (currentPage < totalPages) {
+        await renderPage(currentPage + 1);
+        startSpeech(); // auto-advance
+      } else {
+        statusEl.textContent = 'Leitura concluída! 🎉';
+      }
+    };
+
+    utterance.onerror = (e) => {
+      speakingBadge.classList.remove('active');
+      btnPlay.disabled  = false;
+      btnPause.disabled = true;
+      statusEl.textContent = 'Erro na leitura: ' + e.error;
+    };
+
+    speechSynthesis.speak(utterance);
+  }
+
+  function pauseSpeech() {
+    if (speechSynthesis.speaking && !isPaused) {
+      speechSynthesis.pause();
+      isPaused = true;
+      btnPlay.disabled  = false;
+      btnPause.disabled = true;
+      speakingBadge.classList.remove('active');
+      statusEl.textContent = 'Pausado.';
+    } else if (isPaused) {
+      speechSynthesis.resume();
+      isPaused = false;
+      btnPlay.disabled  = true;
+      btnPause.disabled = false;
+      speakingBadge.classList.add('active');
+      statusEl.textContent = `Lendo página ${currentPage}…`;
+    }
+  }
+
+  function stopSpeech() {
+    speechSynthesis.cancel();
+    isPaused = false;
+    utterance = null;
+    speakingBadge.classList.remove('active');
+    btnPlay.disabled  = false;
+    btnPause.disabled = true;
+    statusEl.textContent = 'Parado.';
+  }
+
+  btnPlay.addEventListener('click', () => {
+    if (isPaused) pauseSpeech();
+    else startSpeech();
+  });
+  btnPause.addEventListener('click', pauseSpeech);
+  btnStop.addEventListener('click', stopSpeech);
+
+  // ── New file ───────────────────────────────────────────
+  newFileBtn.addEventListener('click', () => {
+    stopSpeech();
+    pdfDoc = null; pageTexts = {}; currentPage = 1; totalPages = 0;
+    dropZone.style.display = '';
+    bookInfo.style.display = 'none';
+    progressWrap.style.display = 'none';
+    pageNav.style.display = 'none';
+    textPreview.style.display = 'none';
+    controls.style.display = 'none';
+    newFileBtn.style.display = 'none';
+    fileInput.value = '';
+    statusEl.textContent = '';
+  });
+
+  // ── PWA Install ────────────────────────────────────────
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredInstall = e;
+    installBanner.style.display = 'flex';
+  });
+
+  installBtn.addEventListener('click', async () => {
+    if (!deferredInstall) return;
+    deferredInstall.prompt();
+    const { outcome } = await deferredInstall.userChoice;
+    if (outcome === 'accepted') installBanner.style.display = 'none';
+    deferredInstall = null;
+  });
+
+  // ── Service Worker ─────────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>
